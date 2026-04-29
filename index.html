@@ -223,6 +223,7 @@ h1, h2, h3, h4, h5, h6, label { font-family: var(--font-heading); }
   white-space: nowrap;
 }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.success { background:var(--secondary); color:#000; }
 .toast.warning { background:var(--amber); color:#000; }
 .toast.error   { background:var(--red); color:#fff; }
 
@@ -275,7 +276,6 @@ h1, h2, h3, h4, h5, h6, label { font-family: var(--font-heading); }
 @keyframes sweep       { 0%{top:0%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:100%;opacity:0} }
 </style>
 
-  <!-- ✅ html5-qrcode from CDN — works fine on Render (only blocked inside Apps Script) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
@@ -359,6 +359,9 @@ h1, h2, h3, h4, h5, h6, label { font-family: var(--font-heading); }
 <script>
   
   const API_URL = 'https://script.google.com/macros/s/AKfycbxyRZMhhCTmitJq9PLQ3ODPDXSeEckq_fR3vEUd9TcuVXGWBqzi4rwL0VygsOCGMvDpFg/exec';
+
+  // ── Fix #7: Track last QR detection time ──
+  let lastDetectionTime = Date.now();
 
 function jsonp(url, callback) {
   const cbName = 'jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
@@ -480,24 +483,33 @@ function jsonp(url, callback) {
       }
       return { valid: true, payload: payload };
     } catch (e) {
-      return { valid: false, reason: "Unreadable QR code" };
+      // Fix #9: clearer error message
+      return { valid: false, reason: "QR not valid JSON" };
     }
   }
 
   // ── Scan Handler ──
   function onScanSuccess(decodedText) {
+    // Fix #2: RAW QR debug log + update detection time
+    console.log("RAW QR:", decodedText);
+    lastDetectionTime = Date.now();
+
     if (scanCooldown) return;
     scanCooldown = true;
 
     var decoded = decodeQRPayload(decodedText);
+
+    // Fix #4: Toast on invalid QR
     if (!decoded.valid) {
+      console.warn("QR rejected:", decoded.reason);
+      showToast(decoded.reason, "error");
       showResultCard('INVALID', { message: decoded.reason });
+      scanCooldown = false;
       return;
     }
 
     var p = decoded.payload;
 
-    // ✅ JSONP instead of fetch() — bypasses CORS block
     var scanUrl = API_URL
       + '?action=scan'
       + '&userId='  + encodeURIComponent(p.userId)
@@ -508,7 +520,10 @@ function jsonp(url, callback) {
     jsonp(scanUrl, function(err, data) {
       if (err) {
         console.error('Scan JSONP error:', err);
+        // Fix #6: Toast on server error + reset cooldown
+        showToast("Server Error", "error");
         showResultCard('INVALID', { message: "Server Error" });
+        scanCooldown = false;
         return;
       }
       if (data.status === 'DUPLICATE') {
@@ -519,11 +534,18 @@ function jsonp(url, callback) {
       } else {
         showResultCard(data.status, data);
         prependLogToStrip(data);
+
+        // Fix #5: Success toast with IN/OUT + time
+        var time = new Date(data.scannedAt || Date.now()).toLocaleTimeString();
+        showToast(data.status + " at " + time, "success");
       }
     });
   }
 
-  function onScanError() { /* intentionally silent */ }
+  // Fix #3: Log scan errors instead of silently swallowing them
+  function onScanError(err) {
+    console.log("SCAN ERROR:", err);
+  }
 
   // ── Init Camera ──
   window.addEventListener('load', function() {
@@ -539,7 +561,8 @@ function jsonp(url, callback) {
 
     scanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
+      // Fix #1: Better scanner detection config
+      { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0, disableFlip: false },
       onScanSuccess,
       onScanError
     )
@@ -559,6 +582,14 @@ function jsonp(url, callback) {
       }
     });
   });
+
+  // Fix #7: "No QR detected" warning after 5s of silence
+  setInterval(function() {
+    if (Date.now() - lastDetectionTime > 5000) {
+      showToast("No QR detected", "warning");
+      lastDetectionTime = Date.now();
+    }
+  }, 5000);
 
   // ── Logs Strip ──
   var logsStrip = document.getElementById('logsStrip');
@@ -584,7 +615,6 @@ function jsonp(url, callback) {
     reversed.forEach(function(log) { prependLogToStrip(log); });
   }
 
-  // ✅ JSONP instead of fetch() — bypasses CORS block
   function fetchLogs() {
     jsonp(API_URL + '?action=logs', function(err, data) {
       if (err) {
