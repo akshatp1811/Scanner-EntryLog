@@ -403,36 +403,28 @@ async function startScan() {
   document.getElementById('sbtnLbl').textContent = 'Starting…';
 
   try {
-    // ZXing MultiFormatReader — best mobile QR detection
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+    // No hints — ZXing.DecodeHintType does not exist in the UMD build
+    codeReader = new ZXing.BrowserMultiFormatReader();
 
-    codeReader = new ZXing.BrowserMultiFormatReader(hints, 300);
-
-    const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
-    // Prefer back camera
-    const backCam = devices.find(d =>
-      d.label.toLowerCase().includes('back') ||
-      d.label.toLowerCase().includes('rear') ||
-      d.label.toLowerCase().includes('environment')
-    ) || devices[devices.length - 1] || devices[0];
-
-    if (!backCam) {
-      showToast('❌ No camera found', 'err');
-      btn.disabled = false;
-      document.getElementById('sbtnLbl').textContent = 'Start Scan';
-      return;
+    // listVideoInputDevices is an instance method in @zxing/library
+    let deviceId = undefined; // undefined = let ZXing pick environment camera
+    try {
+      const devices = await codeReader.listVideoInputDevices();
+      const backCam = devices.find(d =>
+        /back|rear|environment/i.test(d.label)
+      ) || devices[devices.length - 1];
+      if (backCam) deviceId = backCam.deviceId;
+    } catch(e) {
+      // listing failed — proceed with undefined, ZXing will use default camera
+      console.warn('Could not list cameras, using default:', e);
     }
 
     await codeReader.decodeFromVideoDevice(
-      backCam.deviceId,
+      deviceId,
       'video',
       (result, err) => {
-        if (result) {
-          handleQR(result.getText());
-        }
-        // err fires every frame when no QR — ignore silently
+        if (result) handleQR(result.getText());
+        // err fires on every frame with no QR — ignore silently
       }
     );
 
@@ -443,7 +435,7 @@ async function startScan() {
   } catch(err) {
     btn.disabled = false;
     document.getElementById('sbtnLbl').textContent = 'Start Scan';
-    console.error("Camera error:", err);
+    console.error('Camera error:', err);
     const s = String(err);
     if (s.includes('NotAllowedError') || s.includes('ermission')) {
       document.getElementById('errScreen').classList.add('show');
