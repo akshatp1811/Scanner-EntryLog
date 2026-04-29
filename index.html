@@ -1,530 +1,570 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <base target="_top">
-  <meta name="description" content="Scanner Interface for Digital ID">
-<style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="description" content="Scanner Interface for Antbox Digital ID">
+  <title>Antbox Scanner</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;700;800&display=swap');
 
 :root {
-  --bg-color: #08080f;
-  --surface-color: #111119;
-  --surface-2-color: #1a1a24;
-  --border-color: rgba(255, 255, 255, 0.07);
-  --primary: #7B61FF;
-  --secondary: #2DD4BF;
-  --amber: #FBBF24;
-  --red: #F87171;
-  --text-main: #EEEEFF;
-  --text-muted: #6B6B8A;
-  --font-heading: 'Syne', sans-serif;
-  --font-mono: 'DM Mono', monospace;
-  --transition-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bg:       #08080f;
+  --surface:  #111119;
+  --surface2: #1a1a24;
+  --border:   rgba(255,255,255,0.07);
+  --primary:  #7B61FF;
+  --secondary:#2DD4BF;
+  --amber:    #FBBF24;
+  --red:      #F87171;
+  --text:     #EEEEFF;
+  --muted:    #6B6B8A;
+  --heading:  'Syne', sans-serif;
+  --mono:     'DM Mono', monospace;
+  --spring:   cubic-bezier(0.34,1.56,0.64,1);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*{box-sizing:border-box;margin:0;padding:0;}
 
-body {
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  font-family: var(--font-heading);
-  min-height: 100vh;
-  overflow-x: hidden;
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--heading);min-height:100vh;
+  overflow-x:hidden;display:flex;flex-direction:column;
 }
 
-h1, h2, h3, h4, h5, h6, label { font-family: var(--font-heading); }
-.mono { font-family: var(--font-mono); }
-
-.btn-primary {
-  width: 100%; background: var(--primary); color: white; border: none;
-  padding: 1rem; border-radius: 8px; font-size: 1.1rem; font-weight: 700;
-  cursor: pointer; transition: all 0.2s ease;
+/* ── Top Bar ── */
+.top-bar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0.9rem 1.2rem;z-index:10;flex-shrink:0;
+  border-bottom:1px solid var(--border);gap:0.5rem;flex-wrap:wrap;
 }
-.btn-primary:hover:not(:disabled) { box-shadow: 0 0 15px rgba(123, 97, 255, 0.4); }
-.btn-primary:active:not(:disabled) { transform: scale(0.97); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.scanner-container {
-  height: 100vh; display: flex; flex-direction: column;
-  position: relative; overflow: hidden;
+.app-brand{font-weight:800;font-size:1.1rem;white-space:nowrap;}
+.clock-display{
+  font-family:var(--mono);font-size:0.75rem;color:var(--muted);
+  display:none;text-align:center;flex:1;
 }
-
-.top-bar {
-  display: flex; justify-content: space-between;
-  align-items: center; padding: 1.5rem; z-index: 10;
+@media(min-width:480px){.clock-display{display:block;}}
+.status-indicator{
+  display:flex;align-items:center;gap:0.4rem;
+  font-size:0.8rem;font-weight:700;white-space:nowrap;
 }
-
-.app-brand { font-weight: 800; font-size: 1.2rem; }
-
-.clock-display { font-size: 0.9rem; color: var(--text-muted); display: none; }
-@media (min-width: 640px) { .clock-display { display: block; } }
-
-.status-indicator {
-  display: flex; align-items: center; gap: 0.5rem;
-  font-size: 0.9rem; font-weight: 700;
+.status-dot{
+  width:9px;height:9px;background:var(--secondary);
+  border-radius:50%;animation:pulseDot 2s infinite;flex-shrink:0;
 }
 
-.status-dot {
-  width: 10px; height: 10px;
-  background-color: var(--secondary);
-  border-radius: 50%; animation: pulseDot 2s infinite;
+/* ── Main Layout ── */
+.scanner-wrap{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:1rem;gap:1rem;position:relative;
 }
 
-.viewfinder-container {
-  flex: 1; display: flex; flex-direction: column;
-  justify-content: center; align-items: center; position: relative;
+/* ── Viewfinder ── */
+.viewfinder-box{
+  width:min(75vw,300px);aspect-ratio:1/1;position:relative;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:20px 20px;overflow:hidden;border-radius:4px;
+  flex-shrink:0;
 }
 
-.viewfinder {
-  width: min(80vw, 340px); aspect-ratio: 1 / 1; position: relative;
-  background-image: linear-gradient(var(--border-color) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
-  background-size: 20px 20px; margin-bottom: 2rem; overflow: hidden;
+/* hide html5-qrcode injected UI noise */
+.viewfinder-box > img,
+.viewfinder-box > div[style]{display:none!important;}
+.viewfinder-box video{
+  width:100%!important;height:100%!important;
+  object-fit:cover!important;border-radius:0!important;
 }
 
-.bracket {
-  position: absolute; width: 40px; height: 40px;
-  border-color: var(--primary); border-style: solid;
-  animation: pulseBracket 2s infinite alternate;
-  opacity: 0; animation-fill-mode: forwards;
+.bracket{
+  position:absolute;width:36px;height:36px;
+  border-color:var(--primary);border-style:solid;
+  animation:pulseBracket 2s infinite alternate;
 }
-.bracket.tl { top:0; left:0; border-width:4px 0 0 4px; border-top-left-radius:12px; animation-name:drawTl,pulseBracket; }
-.bracket.tr { top:0; right:0; border-width:4px 4px 0 0; border-top-right-radius:12px; animation-name:drawTr,pulseBracket; }
-.bracket.bl { bottom:0; left:0; border-width:0 0 4px 4px; border-bottom-left-radius:12px; animation-name:drawBl,pulseBracket; }
-.bracket.br { bottom:0; right:0; border-width:0 4px 4px 0; border-bottom-right-radius:12px; animation-name:drawBr,pulseBracket; }
+.bracket.tl{top:0;left:0;border-width:4px 0 0 4px;border-top-left-radius:10px;}
+.bracket.tr{top:0;right:0;border-width:4px 4px 0 0;border-top-right-radius:10px;}
+.bracket.bl{bottom:0;left:0;border-width:0 0 4px 4px;border-bottom-left-radius:10px;}
+.bracket.br{bottom:0;right:0;border-width:0 4px 4px 0;border-bottom-right-radius:10px;}
 
-.scan-line {
-  position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-  background: var(--primary); box-shadow: 0 0 10px var(--primary);
-  animation: sweep 2s linear infinite;
+.scan-line{
+  position:absolute;top:0;left:0;width:100%;height:2px;
+  background:var(--primary);box-shadow:0 0 10px var(--primary);
+  animation:sweep 2s linear infinite;display:none;
 }
+.scanning .scan-line{display:block;}
 
-.result-card {
-  position: absolute; bottom: 100px; left: 50%;
-  transform: translateX(-50%) translateY(150%);
-  width: 90%; max-width: 360px; background: var(--surface-color);
-  border: 1px solid var(--border-color); padding: 1.5rem;
-  border-radius: 16px; z-index: 20;
-  transition: transform 0.5s var(--transition-spring);
-}
-.result-card.show { transform: translateX(-50%) translateY(0); }
-.result-card.status-in      { background: rgba(45,212,191,0.1); border-color: var(--secondary); }
-.result-card.status-out     { background: rgba(251,191,36,0.1); border-color: var(--amber); }
-.result-card.status-invalid { background: rgba(248,113,113,0.1); border-color: var(--red); }
-
-.badge { padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: 800; font-size: 0.8rem; }
-.badge.in      { background: rgba(45,212,191,0.2); color: var(--secondary); }
-.badge.out     { background: rgba(251,191,36,0.2); color: var(--amber); }
-.badge.invalid { background: rgba(248,113,113,0.2); color: var(--red); }
-
-.logs-strip {
-  height: 70px; background: var(--surface-2-color);
-  border-top: 1px solid var(--border-color);
-  display: flex; align-items: center; padding: 0 1.5rem;
-  gap: 1rem; overflow-x: auto; scrollbar-width: none;
-}
-.logs-strip::-webkit-scrollbar { display: none; }
-
-.log-pill {
-  background: var(--surface-color); border: 1px solid var(--border-color);
-  padding: 0.5rem 1rem; border-radius: 20px;
-  display: flex; align-items: center; gap: 0.5rem;
-  white-space: nowrap; font-size: 0.85rem;
+.hint-text{
+  color:var(--muted);font-size:0.85rem;text-align:center;
 }
 
-#viewfinder-container > img,
-#viewfinder-container > div[style] { display: none !important; }
-#viewfinder-container video {
-  width: 100% !important; height: 100% !important;
-  object-fit: cover !important; border-radius: 0 !important;
+/* ── Scan Button ── */
+.scan-btn{
+  display:flex;align-items:center;justify-content:center;gap:0.6rem;
+  width:min(280px,80vw);padding:0.85rem 1.5rem;
+  background:var(--primary);color:#fff;border:none;
+  border-radius:12px;font-family:var(--heading);
+  font-size:1rem;font-weight:700;cursor:pointer;
+  transition:all 0.2s ease;position:relative;
+}
+.scan-btn:hover:not(:disabled){box-shadow:0 0 20px rgba(123,97,255,0.45);}
+.scan-btn:active:not(:disabled){transform:scale(0.97);}
+.scan-btn:disabled{opacity:0.55;cursor:not-allowed;}
+.scan-btn.active{background:#3d3560;}
+.scan-btn .btn-icon{font-size:1.1rem;}
+
+/* ── Result Card ── */
+.result-card{
+  width:min(360px,90vw);background:var(--surface);
+  border:1px solid var(--border);padding:1.2rem;
+  border-radius:14px;transform:translateY(30px);
+  opacity:0;transition:all 0.45s var(--spring);
+  pointer-events:none;
+}
+.result-card.show{transform:translateY(0);opacity:1;pointer-events:auto;}
+.result-card.status-in    {background:rgba(45,212,191,0.08);border-color:var(--secondary);}
+.result-card.status-out   {background:rgba(251,191,36,0.08); border-color:var(--amber);}
+.result-card.status-invalid{background:rgba(248,113,113,0.08);border-color:var(--red);}
+
+.res-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;}
+.res-name{font-size:1.2rem;font-weight:700;margin-bottom:0.15rem;}
+.res-role{color:var(--muted);font-size:0.82rem;}
+.res-meta{margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);}
+.res-id  {font-family:var(--mono);color:var(--primary);font-size:0.85rem;margin-bottom:0.25rem;}
+.res-time{font-family:var(--mono);color:var(--muted);font-size:0.78rem;}
+
+.badge{padding:0.2rem 0.6rem;border-radius:12px;font-weight:800;font-size:0.78rem;white-space:nowrap;}
+.badge.in     {background:rgba(45,212,191,0.2);color:var(--secondary);}
+.badge.out    {background:rgba(251,191,36,0.2); color:var(--amber);}
+.badge.invalid{background:rgba(248,113,113,0.2);color:var(--red);}
+.badge.duplicate{background:rgba(251,191,36,0.2);color:var(--amber);}
+
+/* ── Logs Strip ── */
+.logs-strip{
+  flex-shrink:0;min-height:58px;max-height:70px;
+  background:var(--surface2);border-top:1px solid var(--border);
+  display:flex;align-items:center;padding:0 1rem;
+  gap:0.75rem;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+  width:100%;
+}
+.logs-strip::-webkit-scrollbar{display:none;}
+.log-pill{
+  background:var(--surface);border:1px solid var(--border);
+  padding:0.4rem 0.8rem;border-radius:20px;
+  display:flex;align-items:center;gap:0.4rem;
+  white-space:nowrap;font-size:0.82rem;flex-shrink:0;
 }
 
-.toast {
-  position: fixed; top: 20px; left: 50%;
-  transform: translateX(-50%) translateY(-20px);
-  padding: 1rem 1.5rem; border-radius: 8px; color: #fff;
-  font-weight: 700; opacity: 0; transition: all 0.3s ease;
-  z-index: 1000; pointer-events: none; white-space: nowrap;
+/* ── Toast ── */
+.toast{
+  position:fixed;top:16px;left:50%;
+  transform:translateX(-50%) translateY(-24px);
+  padding:0.75rem 1.25rem;border-radius:10px;color:#fff;
+  font-family:var(--heading);font-weight:700;font-size:0.9rem;
+  opacity:0;transition:all 0.3s ease;z-index:2000;
+  pointer-events:none;max-width:90vw;text-align:center;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
 }
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.toast.success { background: var(--secondary); color: #000; }
-.toast.warning { background: var(--amber); color: #000; }
-.toast.error   { background: var(--red); color: #fff; }
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.success{background:var(--secondary);color:#000;}
+.toast.warning{background:var(--amber);color:#000;}
+.toast.error  {background:var(--red);color:#fff;}
+.toast.info   {background:var(--primary);color:#fff;}
 
-.full-screen-error {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--bg-color); display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  z-index: 50; text-align: center; padding: 2rem;
+/* ── Overlays ── */
+#loadingOverlay,#cameraErrorState{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;z-index:100;gap:1rem;text-align:center;padding:2rem;
 }
-.full-screen-error.hidden { display: none; }
+#loadingOverlay.hidden,#cameraErrorState.hidden{display:none!important;}
 
-#loadingOverlay {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--bg-color); display: flex; flex-direction: column;
-  align-items: center; justify-content: center; z-index: 40; gap: 1rem;
+.spinner{
+  width:38px;height:38px;border:3px solid var(--border);
+  border-top-color:var(--primary);border-radius:50%;
+  animation:spin 0.8s linear infinite;
 }
-#loadingOverlay.hidden { display: none; }
-
-.spinner {
-  width: 40px; height: 40px;
-  border: 3px solid var(--border-color);
-  border-top-color: var(--primary);
-  border-radius: 50%; animation: spin 0.8s linear infinite;
+.btn-retry{
+  margin-top:0.5rem;padding:0.75rem 2rem;
+  background:var(--primary);color:#fff;border:none;
+  border-radius:10px;font-family:var(--heading);
+  font-size:1rem;font-weight:700;cursor:pointer;
+}
+.err-icon{
+  width:56px;height:56px;border:2px solid var(--red);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--red);font-size:2rem;font-weight:700;
 }
 
-@keyframes spin         { to { transform: rotate(360deg); } }
-@keyframes pulseDot     { 0%{box-shadow:0 0 0 0 rgba(45,212,191,0.7)} 70%{box-shadow:0 0 0 10px rgba(45,212,191,0)} 100%{box-shadow:0 0 0 0 rgba(45,212,191,0)} }
-@keyframes drawTl       { to { opacity: 1; } }
-@keyframes drawTr       { to { opacity: 1; } }
-@keyframes drawBl       { to { opacity: 1; } }
-@keyframes drawBr       { to { opacity: 1; } }
-@keyframes pulseBracket { from { opacity: 0.6; } to { opacity: 1; } }
-@keyframes sweep        { 0%{top:0%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:100%;opacity:0} }
-</style>
+/* ── Admin link ── */
+.admin-link{
+  position:fixed;top:0.6rem;right:0.8rem;z-index:200;
+  color:var(--muted);font-size:0.75rem;text-decoration:none;opacity:0.45;
+}
 
-  <!-- A: QR library via CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+/* ── Back link ── */
+.back-link{
+  color:var(--muted);font-size:0.8rem;text-decoration:none;
+  display:inline-flex;align-items:center;gap:0.3rem;
+}
+.back-link:hover{color:var(--text);}
+
+/* ── Keyframes ── */
+@keyframes spin        {to{transform:rotate(360deg);}}
+@keyframes pulseDot    {0%{box-shadow:0 0 0 0 rgba(45,212,191,0.7)}70%{box-shadow:0 0 0 8px rgba(45,212,191,0)}100%{box-shadow:0 0 0 0 rgba(45,212,191,0)}}
+@keyframes pulseBracket{from{opacity:0.55}to{opacity:1}}
+@keyframes sweep       {0%{top:0%;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+  </style>
 </head>
 <body>
 
-<div style="position:absolute; top:1rem; right:1rem; z-index:100;">
-  <a href="https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec?action=admin"
-    target="_blank"
-    style="color:var(--text-muted); font-size:0.8rem; text-decoration:none; opacity:0.5;">Admin</a>
+<a class="admin-link"
+   href="https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec?action=admin"
+   target="_blank">Admin ↗</a>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p style="color:var(--muted);font-size:0.9rem;">Initialising scanner…</p>
 </div>
 
-<div class="scanner-container">
+<!-- Camera permission error -->
+<div id="cameraErrorState" class="hidden">
+  <div class="err-icon">!</div>
+  <h2 style="margin-bottom:0.5rem;">Camera Access Required</h2>
+  <p style="color:var(--muted);margin-bottom:1.5rem;">Allow camera permissions to use the scanner.</p>
+  <button class="btn-retry" onclick="location.reload()">Retry</button>
+</div>
 
-  <div id="loadingOverlay">
-    <div class="spinner"></div>
-    <p style="color:var(--text-muted); font-size:0.9rem;">Starting camera...</p>
+<!-- Top Bar -->
+<div class="top-bar">
+  <div class="app-brand">Antbox<span style="color:var(--primary);">ID</span></div>
+  <div class="clock-display mono" id="liveClock">--</div>
+  <div class="status-indicator">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Ready</span>
+  </div>
+</div>
+
+<!-- Main Scanner Area -->
+<div class="scanner-wrap" id="scannerWrap">
+
+  <!-- Viewfinder -->
+  <div class="viewfinder-box" id="viewfinder-container">
+    <div class="bracket tl"></div>
+    <div class="bracket tr"></div>
+    <div class="bracket bl"></div>
+    <div class="bracket br"></div>
+    <div class="scan-line"></div>
   </div>
 
-  <div class="top-bar">
-    <div class="app-brand">DigitalID</div>
-    <div class="clock-display mono" id="live-clock">--</div>
-    <div class="status-indicator">
-      <div class="status-dot"></div>
-      <span id="statusText">Starting...</span>
-    </div>
-  </div>
+  <p class="hint-text" id="hintText">Press <strong>Start Scan</strong> to activate the camera</p>
 
-  <div id="cameraErrorState" class="full-screen-error hidden">
-    <div style="width:64px; height:64px; border:2px solid var(--red); border-radius:8px;
-      display:flex; align-items:center; justify-content:center;
-      margin-bottom:1rem; color:var(--red); font-weight:bold; font-size:2rem;">!</div>
-    <h2 style="margin-bottom:1rem;">Camera Access Required</h2>
-    <p style="color:var(--text-muted); margin-bottom:2rem;">
-      Please allow camera permissions to use the scanner.
-    </p>
-    <button class="btn-primary" style="max-width:200px;" onclick="location.reload()">Retry</button>
-  </div>
+  <!-- Scan Button -->
+  <button class="scan-btn" id="scanBtn" onclick="toggleScan()">
+    <span class="btn-icon">⬡</span>
+    <span id="scanBtnLabel">Start Scan</span>
+  </button>
 
-  <div class="viewfinder-container">
-    <div class="viewfinder" id="viewfinder-container">
-      <div class="bracket tl"></div>
-      <div class="bracket tr"></div>
-      <div class="bracket bl"></div>
-      <div class="bracket br"></div>
-      <div class="scan-line"></div>
-    </div>
-    <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:2rem;">
-      Align QR code within frame
-    </p>
-    <a href="https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec"
-      style="display:block; margin-top:1rem; color:var(--text-muted); font-size:0.8rem; text-decoration:none;">
-      &larr; Back to Register
-    </a>
-  </div>
-
+  <!-- Result Card (in-flow, not absolute) -->
   <div class="result-card" id="resultCard">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+    <div class="res-row">
       <div>
-        <h3 id="resName" style="font-size:1.3rem; margin-bottom:0.2rem;">--</h3>
-        <p  id="resRole" style="color:var(--text-muted); font-size:0.85rem;">--</p>
+        <div class="res-name" id="resName">--</div>
+        <div class="res-role" id="resRole">--</div>
       </div>
       <span class="badge" id="resStatusBadge">--</span>
     </div>
-    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-color);">
-      <p class="mono" id="resId"   style="color:var(--primary); font-size:0.9rem; margin-bottom:0.3rem;">--</p>
-      <p class="mono" id="resTime" style="color:var(--text-muted); font-size:0.8rem;">--</p>
+    <div class="res-meta">
+      <div class="res-id"   id="resId">--</div>
+      <div class="res-time" id="resTime">--</div>
     </div>
   </div>
 
-  <div class="logs-strip" id="logsStrip"></div>
+  <a class="back-link" href="https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec">
+    ← Back to Register
+  </a>
+
 </div>
 
+<!-- Logs Strip -->
+<div class="logs-strip" id="logsStrip">
+  <span style="color:var(--muted);font-size:0.8rem;flex-shrink:0;">Recent scans will appear here</span>
+</div>
+
+<!-- Toast -->
 <div class="toast" id="toastBox"></div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec';
 
-  // H: Track last QR detection time
-  let lastDetectionTime = Date.now();
+/* ── State ── */
+let scanner        = null;
+let isScanning     = false;
+let scanCooldown   = false;
+let noQrTimer      = null;
+let hideCardTimer  = null;
 
-  // I: Robust JSONP helper
-  function jsonp(url, callback) {
-    const cbName = 'jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-    const script = document.createElement('script');
-    let finished = false;
+/* ── Clock ── */
+(function tickClock(){
+  const el = document.getElementById('liveClock');
+  const now = new Date();
+  el.textContent =
+    now.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})
+    + ' · ' + now.toTimeString().slice(0,8);
+  setTimeout(tickClock, 1000);
+})();
 
-    window[cbName] = function(data) {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      script.remove();
-      delete window[cbName];
-      callback(null, data);
-    };
+/* ── Toast ── */
+const toastEl = document.getElementById('toastBox');
+let toastTimer;
+function showToast(msg, type) {
+  clearTimeout(toastTimer);
+  toastEl.textContent = msg;
+  toastEl.className   = 'toast show ' + (type || 'info');
+  toastTimer = setTimeout(()=> toastEl.classList.remove('show'), 3000);
+}
 
-    const timer = setTimeout(function() {
-      if (finished) return;
-      finished = true;
-      script.remove();
-      delete window[cbName];
-      callback(new Error('JSONP timeout'));
-    }, 8000);
+/* ── Result Card ── */
+const resultCard = document.getElementById('resultCard');
+function showResultCard(status, data) {
+  const s = status.toLowerCase();
+  document.getElementById('resName').textContent = data.name    || (status === 'INVALID' ? (data.message || 'Error') : 'Unknown');
+  document.getElementById('resRole').textContent = data.role    || (status === 'INVALID' ? '' : 'N/A');
+  document.getElementById('resId').textContent   = data.userId  || '';
+  const ts = data.timestamp || data.scannedAt;
+  document.getElementById('resTime').textContent = ts ? new Date(ts).toLocaleTimeString() : '--';
+  const badge = document.getElementById('resStatusBadge');
+  badge.textContent = status;
+  badge.className   = 'badge ' + s;
+  resultCard.className = 'result-card status-' + s + ' show';
+  clearTimeout(hideCardTimer);
+  hideCardTimer = setTimeout(()=>{
+    resultCard.classList.remove('show');
+    resultCard.className = 'result-card';
+  }, 4000);
+}
 
-    script.onerror = function() {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      script.remove();
-      delete window[cbName];
-      callback(new Error('JSONP script load error'));
-    };
+/* ── JSONP ── */
+function jsonp(url, cb) {
+  const name = 'jcb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const s    = document.createElement('script');
+  let done   = false;
 
-    const sep = url.includes('?') ? '&' : '?';
-    script.src = url + sep + 'callback=' + cbName;
-    document.head.appendChild(script);
+  window[name] = function(data){
+    if(done) return; done = true;
+    clearTimeout(t); s.remove(); delete window[name];
+    cb(null, data);
+  };
+  const t = setTimeout(()=>{
+    if(done) return; done = true;
+    s.remove(); delete window[name];
+    cb(new Error('timeout'));
+  }, 9000);
+  s.onerror = ()=>{
+    if(done) return; done = true;
+    clearTimeout(t); s.remove(); delete window[name];
+    cb(new Error('load error'));
+  };
+  s.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + name;
+  document.head.appendChild(s);
+}
+
+/* ── QR Decode ── */
+function decodeQR(raw) {
+  try {
+    const p = JSON.parse(raw);
+    if (!p.userId) return { valid:false, reason:'Missing userId in QR' };
+    return { valid:true, payload:p };
+  } catch(e) {
+    return { valid:false, reason:'QR data is not valid JSON' };
+  }
+}
+
+/* ── On Scan Success ── */
+function onScanSuccess(raw) {
+  if (scanCooldown) return;
+
+  // Reset the "no QR" timer each time something is detected
+  resetNoQrTimer();
+
+  const decoded = decodeQR(raw);
+  if (!decoded.valid) {
+    showToast('❌ ' + decoded.reason, 'error');
+    return;
   }
 
-  // ── Clock ──
-  function updateClock() {
-    const now      = new Date();
-    const datePart = now.toLocaleDateString('en-IN', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-    });
-    const timePart = now.toTimeString().split(' ')[0];
-    document.getElementById('live-clock').textContent = datePart + ' · ' + timePart;
-  }
-  setInterval(updateClock, 1000);
-  updateClock();
+  scanCooldown = true;
+  showToast('QR detected — sending…', 'info');
 
-  // ── Toast ──
-  const toastBox = document.getElementById('toastBox');
-  let toastTimeout;
-  function showToast(message, type) {
-    clearTimeout(toastTimeout);
-    toastBox.textContent = message;
-    toastBox.className   = 'toast show ' + type;
-    toastTimeout = setTimeout(function() {
-      toastBox.classList.remove('show');
-    }, 2500);
-  }
+  const p = decoded.payload;
+  const url = API_URL
+    + '?action=scan'
+    + '&userId=' + encodeURIComponent(p.userId)
+    + '&name='   + encodeURIComponent(p.name   || '')
+    + '&role='   + encodeURIComponent(p.role   || '')
+    + '&issued=' + encodeURIComponent(p.issued || '');
 
-  // ── Result Card ──
-  const resultCard = document.getElementById('resultCard');
-  let hideTimeout;
-  let scanCooldown = false;
-
-  function showResultCard(status, data) {
-    const name      = data.name      || "Unknown";
-    const role      = data.role      || "N/A";
-    const userId    = data.userId    || "--";
-    const timestamp = data.timestamp || data.scannedAt;
-    const message   = data.message   || "";
-
-    document.getElementById('resName').textContent = name;
-    document.getElementById('resRole').textContent = role;
-    document.getElementById('resId').textContent   = userId;
-    document.getElementById('resTime').textContent = timestamp
-      ? new Date(timestamp).toLocaleTimeString() : "--";
-
-    const badge       = document.getElementById('resStatusBadge');
-    badge.textContent = status;
-    badge.className   = 'badge ' + status.toLowerCase();
-
-    if (status === 'INVALID') {
-      document.getElementById('resName').textContent = message || "Scan Error";
-      document.getElementById('resRole').textContent = "";
-      document.getElementById('resId').textContent   = "";
-    }
-
-    resultCard.className = 'result-card status-' + status.toLowerCase();
-    resultCard.classList.add('show');
-
-    clearTimeout(hideTimeout);
-    hideTimeout = setTimeout(function() {
-      resultCard.classList.remove('show');
+  jsonp(url, function(err, data){
+    if (err) {
+      showToast('⚠️ Server error — check connection', 'error');
+      showResultCard('INVALID', { message:'Server Error' });
       scanCooldown = false;
-    }, 3000);
-  }
-
-  // D: Relaxed QR validation
-  function decodeQRPayload(rawString) {
-    try {
-      const payload = JSON.parse(rawString);
-      if (!payload.userId) {
-        return { valid: false, reason: "Missing userId" };
-      }
-      return { valid: true, payload: payload };
-    } catch (e) {
-      return { valid: false, reason: "QR not valid JSON" };
-    }
-  }
-
-  // ── Scan Handler ──
-  function onScanSuccess(decodedText) {
-    // E: Debug logs + update detection time
-    console.log("RAW QR:", decodedText);
-    lastDetectionTime = Date.now();
-
-    // C: Check cooldown BEFORE validation
-    if (scanCooldown) return;
-
-    const decoded = decodeQRPayload(decodedText);
-    console.log("DECODED:", decoded);
-
-    // C: Set cooldown ONLY after valid QR
-    if (!decoded.valid) {
-      showToast(decoded.reason, "error");
       return;
     }
 
-    scanCooldown = true;
+    const st = (data.status || '').toUpperCase();
 
-    // E: Immediate feedback on detection
-    showToast("QR Detected", "success");
+    if (st === 'DUPLICATE') {
+      showToast('⚠️ Already logged — duplicate scan', 'warning');
+      setTimeout(()=>{ scanCooldown = false; }, 2500);
 
-    const p = decoded.payload;
-    const scanUrl = API_URL
-      + '?action=scan'
-      + '&userId=' + encodeURIComponent(p.userId)
-      + '&name='   + encodeURIComponent(p.name   || '')
-      + '&role='   + encodeURIComponent(p.role   || '')
-      + '&issued=' + encodeURIComponent(p.issued || '');
+    } else if (st === 'INVALID') {
+      showToast('❌ ' + (data.message || 'Invalid QR'), 'error');
+      showResultCard('INVALID', { message: data.message });
+      scanCooldown = false;
 
-    // F: JSONP with proper response handling
-    jsonp(scanUrl, function(err, data) {
-      if (err) {
-        console.error('Scan JSONP error:', err);
-        showToast("Server Error", "error");
-        showResultCard('INVALID', { message: "Server Error" });
-        scanCooldown = false;
-        return;
-      }
-
-      if (data.status === 'DUPLICATE') {
-        showToast("Already scanned. Please wait.", "warning");
-        setTimeout(function() { scanCooldown = false; }, 2000);
-
-      } else if (data.status === 'INVALID') {
-        showResultCard('INVALID', { message: data.message });
-
-      } else {
-        showResultCard(data.status, data);
-        prependLogToStrip(data);
-        const time = new Date(data.scannedAt || Date.now()).toLocaleTimeString();
-        showToast(data.status + " at " + time, "success");
-      }
-    });
-  }
-
-  // G: Silence noisy scan errors
-  function onScanError(err) {
-    // Ignore frequent scan errors from library
-  }
-
-  // ── Init Camera ──
-  window.addEventListener('load', function() {
-    if (typeof Html5Qrcode === 'undefined') {
-      document.getElementById('loadingOverlay').classList.add('hidden');
-      const errState = document.getElementById('cameraErrorState');
-      errState.classList.remove('hidden');
-      errState.querySelector('h2').textContent = 'Scanner failed to load';
-      errState.querySelector('p').textContent  = 'Please refresh the page.';
-      return;
+    } else {
+      const time = new Date(data.scannedAt || Date.now()).toLocaleTimeString();
+      showToast('✅ ' + st + ' logged at ' + time, 'success');
+      showResultCard(st, data);
+      prependLog(data);
+      scanCooldown = false;
     }
-
-    const scanner = new Html5Qrcode("viewfinder-container");
-
-    // B: Improved scanner config with dynamic qrbox
-    scanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          return { width: Math.floor(minEdge * 0.7), height: Math.floor(minEdge * 0.7) };
-        },
-        aspectRatio: 1.0,
-        disableFlip: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-        }
-      },
-      onScanSuccess,
-      onScanError
-    )
-    .then(function() {
-      document.getElementById('loadingOverlay').classList.add('hidden');
-      document.getElementById('statusText').textContent = 'Ready to Scan';
-    })
-    .catch(function(err) {
-      console.error("Camera start failed:", err);
-      document.getElementById('loadingOverlay').classList.add('hidden');
-      const errStr = String(err);
-      if (errStr.includes("NotAllowedError") || errStr.includes("permission") || errStr.includes("Permission")) {
-        document.getElementById('cameraErrorState').classList.remove('hidden');
-      } else {
-        document.getElementById('statusText').textContent = 'Camera Error';
-        showToast("Camera error. Please refresh.", "error");
-      }
-    });
   });
+}
 
-  // H: "No QR detected" warning after 5s of silence
-  setInterval(function() {
-    if (Date.now() - lastDetectionTime > 5000) {
-      showToast("No QR detected", "warning");
-      lastDetectionTime = Date.now();
+function onScanError() { /* suppress library noise */ }
+
+/* ── No-QR Timer ── */
+function resetNoQrTimer() {
+  clearTimeout(noQrTimer);
+  if (!isScanning) return;
+  noQrTimer = setTimeout(()=>{
+    if (isScanning) showToast('📷 No QR code visible — adjust camera', 'warning');
+    resetNoQrTimer();
+  }, 7000);
+}
+
+/* ── Toggle Scan ── */
+function toggleScan() {
+  if (!isScanning) startScan(); else stopScan();
+}
+
+function startScan() {
+  const btn   = document.getElementById('scanBtn');
+  const label = document.getElementById('scanBtnLabel');
+  const hint  = document.getElementById('hintText');
+
+  btn.disabled = true;
+  label.textContent = 'Starting…';
+  document.getElementById('statusText').textContent = 'Starting camera…';
+
+  scanner.start(
+    { facingMode:'environment' },
+    {
+      fps: 10,
+      qrbox: function(w, h){
+        const edge = Math.min(w, h);
+        return { width: Math.floor(edge * 0.72), height: Math.floor(edge * 0.72) };
+      },
+      aspectRatio: 1.0,
+      disableFlip: false,
+      experimentalFeatures:{ useBarCodeDetectorIfSupported:true }
+    },
+    onScanSuccess,
+    onScanError
+  )
+  .then(()=>{
+    isScanning = true;
+    btn.disabled = false;
+    btn.classList.add('active');
+    label.textContent = 'Stop Scan';
+    btn.querySelector('.btn-icon').textContent = '◼';
+    hint.textContent = 'Align QR code within the frame';
+    document.getElementById('statusText').textContent = 'Scanning…';
+    document.querySelector('.viewfinder-box').classList.add('scanning');
+    resetNoQrTimer();
+  })
+  .catch(err=>{
+    btn.disabled = false;
+    label.textContent = 'Start Scan';
+    btn.querySelector('.btn-icon').textContent = '⬡';
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    const errStr = String(err);
+    if (errStr.includes('NotAllowedError') || errStr.includes('ermission')) {
+      document.getElementById('cameraErrorState').classList.remove('hidden');
+    } else {
+      showToast('❌ Camera error — please refresh', 'error');
+      document.getElementById('statusText').textContent = 'Camera Error';
     }
-  }, 5000);
+  });
+}
 
-  // ── Logs Strip ──
-  const logsStrip = document.getElementById('logsStrip');
+function stopScan() {
+  clearTimeout(noQrTimer);
+  const btn   = document.getElementById('scanBtn');
+  const label = document.getElementById('scanBtnLabel');
+  btn.disabled = true;
 
-  function prependLogToStrip(log) {
-    const ts      = log.timestamp || log.scannedAt;
-    const timeStr = ts ? new Date(ts).toLocaleTimeString('en-US', {
-      hour: '2-digit', minute: '2-digit', hour12: false
-    }) : '--';
-    const pill     = document.createElement('div');
-    pill.className = 'log-pill';
-    pill.innerHTML = '<span style="font-weight:700">' + log.name + '</span>'
-      + '<span class="badge ' + log.status.toLowerCase()
-      + '" style="font-size:0.6rem; padding:0.1rem 0.4rem;">' + log.status + '</span>'
-      + '<span class="mono" style="color:var(--text-muted); font-size:0.75rem;">' + timeStr + '</span>';
-    logsStrip.prepend(pill);
-  }
+  scanner.stop().then(()=>{
+    isScanning = false;
+    scanCooldown = false;
+    btn.disabled = false;
+    btn.classList.remove('active');
+    label.textContent = 'Start Scan';
+    btn.querySelector('.btn-icon').textContent = '⬡';
+    document.getElementById('hintText').textContent = 'Press Start Scan to activate the camera';
+    document.getElementById('statusText').textContent = 'Idle';
+    document.querySelector('.viewfinder-box').classList.remove('scanning');
+  }).catch(()=>{ btn.disabled = false; });
+}
 
-  function renderLogs(logs) {
+/* ── Logs Strip ── */
+const logsStrip = document.getElementById('logsStrip');
+
+function prependLog(log) {
+  const ts  = log.timestamp || log.scannedAt;
+  const t   = ts ? new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false}) : '--';
+  const pill = document.createElement('div');
+  pill.className = 'log-pill';
+  pill.innerHTML =
+    '<span style="font-weight:700">' + (log.name||'?') + '</span>'
+    + '<span class="badge ' + (log.status||'').toLowerCase() + '" style="font-size:0.6rem;padding:0.1rem 0.4rem;">' + (log.status||'') + '</span>'
+    + '<span class="mono" style="color:var(--muted);font-size:0.72rem;">' + t + '</span>';
+  // Remove placeholder text on first real log
+  const placeholder = logsStrip.querySelector('span');
+  if (placeholder) placeholder.remove();
+  logsStrip.prepend(pill);
+}
+
+function fetchLogs() {
+  jsonp(API_URL + '?action=logs', function(err, data){
+    if (err || !data || !data.logs || !data.logs.length) return;
     logsStrip.innerHTML = '';
-    logs.slice().reverse().forEach(function(log) { prependLogToStrip(log); });
+    data.logs.slice().reverse().forEach(prependLog);
+  });
+}
+
+/* ── Init ── */
+window.addEventListener('load', function(){
+  if (typeof Html5Qrcode === 'undefined') {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    const e = document.getElementById('cameraErrorState');
+    e.classList.remove('hidden');
+    e.querySelector('h2').textContent = 'Scanner failed to load';
+    e.querySelector('p').textContent  = 'Please refresh the page.';
+    return;
   }
 
-  function fetchLogs() {
-    jsonp(API_URL + '?action=logs', function(err, data) {
-      if (err) { console.error("Failed to fetch logs:", err); return; }
-      if (data.success && data.logs && data.logs.length) renderLogs(data.logs);
-    });
-  }
+  scanner = new Html5Qrcode('viewfinder-container');
+  document.getElementById('loadingOverlay').classList.add('hidden');
 
-  setInterval(fetchLogs, 5000);
   fetchLogs();
+  setInterval(fetchLogs, 8000);
+});
 </script>
-
 </body>
 </html>
