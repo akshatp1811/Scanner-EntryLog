@@ -325,6 +325,7 @@ function jsonp(url, cb) {
     clearTimeout(t);
     s.remove();
     delete window[name];
+    console.log('[JSONP] Response received:', data);
     cb(null, data);
   };
 
@@ -333,6 +334,7 @@ function jsonp(url, cb) {
     done = true;
     s.remove();
     delete window[name];
+    console.error('[JSONP] Timeout — backend did not respond in 10s. URL:', url.split('?')[0]);
     cb(new Error('timeout'));
   }, 10000);
 
@@ -342,9 +344,11 @@ function jsonp(url, cb) {
     clearTimeout(t);
     s.remove();
     delete window[name];
+    console.error('[JSONP] Script load error — backend may not be deployed or JSONP not supported.');
     cb(new Error('load error'));
   };
 
+  console.log('[JSONP] Requesting:', url.split('callback=')[0] + 'callback=...');
   s.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + name;
   document.head.appendChild(s);
 }
@@ -360,9 +364,11 @@ function sendToBackend(p) {
 
   jsonp(url, (err, data) => {
     if (err) {
-      showToast('⚠️ Server error — check connection', 'err');
-      showCard('INVALID', { message: 'Server Error' });
-      // FIX: release cooldown after 3s on error so user can retry
+      console.error('[Scan] JSONP failed:', err.message,
+        '\nMost likely cause: Google Apps Script not redeployed after Code.gs changes.'
+        + '\nGo to Apps Script Editor → Deploy → Manage Deployments → Edit → update to latest version.');
+      showToast('⚠️ Backend unreachable — see console', 'err');
+      showCard('INVALID', { message: 'Server Error — redeploy Apps Script?' });
       clearTimeout(coolTimer);
       coolTimer = setTimeout(() => { cooldown = false; }, 3000);
       return;
