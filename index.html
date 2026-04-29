@@ -357,40 +357,52 @@ h1, h2, h3, h4, h5, h6, label { font-family: var(--font-heading); }
 <div class="toast" id="toastBox"></div>
 
 <script>
-  // ✅ Your Apps Script deployment URL
-  const API_URL = 'https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec';
+  
+  const API_URL = 'https://script.google.com/macros/s/AKfycbxyRZMhhCTmitJq9PLQ3ODPDXSeEckq_fR3vEUd9TcuVXGWBqzi4rwL0VygsOCGMvDpFg/exec';
 
-  // ── JSONP helper — replaces ALL fetch() calls ──
-  // Apps Script blocks CORS from external origins, but JSONP via <script> tags works fine.
-  function jsonp(url, callback) {
-    const cbName = 'jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-    const script = document.createElement('script');
+function jsonp(url, callback) {
+  const cbName = 'jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  const script = document.createElement('script');
 
-    window[cbName] = function(data) {
-      script.remove();
-      delete window[cbName];
-      callback(null, data);
-    };
+  let finished = false;
 
-    // Timeout after 8s so scanCooldown doesn't get stuck forever
-    const timer = setTimeout(function() {
-      script.remove();
-      delete window[cbName];
-      callback(new Error('JSONP timeout'));
-    }, 8000);
+  window[cbName] = function(data) {
+    if (finished) return;
+    finished = true;
 
-    script.onerror = function() {
-      clearTimeout(timer);
-      script.remove();
-      delete window[cbName];
-      callback(new Error('JSONP script load error'));
-    };
+    clearTimeout(timer);
+    script.remove();
+    delete window[cbName];
 
-    // Append callback param to URL
-    const sep = url.includes('?') ? '&' : '?';
-    script.src = url + sep + 'callback=' + cbName;
-    document.head.appendChild(script);
-  }
+    callback(null, data);
+  };
+
+  const timer = setTimeout(function() {
+    if (finished) return;
+    finished = true;
+
+    script.remove();
+    delete window[cbName];
+
+    callback(new Error('JSONP timeout'));
+  }, 8000);
+
+  script.onerror = function() {
+    if (finished) return;
+    finished = true;
+
+    clearTimeout(timer);
+    script.remove();
+    delete window[cbName];
+
+    callback(new Error('JSONP script load error'));
+  };
+
+  const sep = url.includes('?') ? '&' : '?';
+  script.src = url + sep + 'callback=' + cbName;
+
+  document.head.appendChild(script);
+}
 
   // ── Clock ──
   function updateClock() {
