@@ -29,6 +29,7 @@ body{
   min-height:100dvh;display:flex;flex-direction:column;overflow-x:hidden;
 }
 
+/* ── Top Bar ── */
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
   flex-wrap:wrap;gap:0.4rem;padding:0.8rem 1rem;flex-shrink:0;
@@ -44,17 +45,18 @@ body{
   animation:pulse 2s infinite;
 }
 .dot.amber{background:var(--amber);animation:none;}
-.dot.red{background:var(--red);animation:none;}
+.dot.red  {background:var(--red);animation:none;}
 
+/* ── Main Wrap ── */
 .wrap{
   flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;padding:1rem;gap:0.9rem;
 }
 
+/* ── Viewfinder ── */
 .vf{
   width:min(78vw,300px);aspect-ratio:1/1;position:relative;
-  border-radius:6px;overflow:hidden;flex-shrink:0;
-  background:#000;
+  border-radius:6px;overflow:hidden;flex-shrink:0;background:#000;
 }
 .vf video{
   position:absolute;inset:0;width:100%;height:100%;
@@ -73,10 +75,13 @@ body{
   position:absolute;top:0;left:0;width:100%;height:2px;z-index:2;
   background:var(--primary);box-shadow:0 0 10px var(--primary);
   animation:sweep 2s linear infinite;
+  display:none; /* hidden until scanning starts */
 }
+.vf.active .sline{display:block;}
 
 .hint{color:var(--muted);font-size:0.83rem;text-align:center;}
 
+/* ── Start/Stop Button ── */
 .sbtn{
   display:flex;align-items:center;justify-content:center;gap:0.5rem;
   width:min(280px,82vw);padding:0.85rem 1.4rem;
@@ -89,10 +94,8 @@ body{
 .sbtn:disabled{opacity:0.5;cursor:not-allowed;}
 .sbtn.stop{background:#3a3060;}
 
-/* Manual entry fallback */
-.manual{
-  display:flex;gap:0.5rem;width:min(340px,90vw);
-}
+/* ── Manual Entry ── */
+.manual{display:flex;gap:0.5rem;width:min(340px,90vw);}
 .manual input{
   flex:1;background:var(--sf2);border:1px solid var(--border);
   color:var(--text);padding:0.7rem 0.9rem;border-radius:10px;
@@ -107,6 +110,7 @@ body{
 }
 .manual button:hover{background:var(--primary);border-color:var(--primary);}
 
+/* ── Result Card ── */
 .card{
   width:min(360px,90vw);background:var(--surface);border:1px solid var(--border);
   padding:1.1rem;border-radius:14px;opacity:0;transform:translateY(20px);
@@ -123,6 +127,7 @@ body{
 .cid  {font-family:var(--mono);color:var(--primary);font-size:0.82rem;margin-bottom:0.2rem;}
 .ctime{font-family:var(--mono);color:var(--muted);font-size:0.75rem;}
 
+/* ── Badges ── */
 .badge{padding:0.2rem 0.55rem;border-radius:10px;font-size:0.75rem;font-weight:800;white-space:nowrap;}
 .badge.in       {background:rgba(45,212,191,.2);color:var(--green);}
 .badge.out      {background:rgba(251,191,36,.2);color:var(--amber);}
@@ -133,6 +138,7 @@ body{
 .back{color:var(--muted);font-size:0.78rem;text-decoration:none;}
 .back:hover{color:var(--text);}
 
+/* ── Logs Strip ── */
 .logs{
   width:100%;flex-shrink:0;min-height:55px;max-height:66px;
   background:var(--sf2);border-top:1px solid var(--border);
@@ -146,6 +152,7 @@ body{
   align-items:center;gap:0.35rem;white-space:nowrap;font-size:0.8rem;flex-shrink:0;
 }
 
+/* ── Toast ── */
 .toast{
   position:fixed;top:14px;left:50%;
   transform:translateX(-50%) translateY(-20px);
@@ -161,6 +168,7 @@ body{
 .toast.err {background:var(--red);}
 .toast.info{background:var(--primary);}
 
+/* ── Error Screen ── */
 #errScreen{
   display:none;position:fixed;inset:0;background:var(--bg);
   flex-direction:column;align-items:center;justify-content:center;
@@ -225,9 +233,8 @@ body{
     <span id="sbtnLbl">Start Scan</span>
   </button>
 
-  <!-- Manual entry fallback -->
   <div class="manual">
-    <input type="text" id="manualInput" placeholder="Paste User ID manually e.g. ANT-20260429-IVMY" />
+    <input type="text" id="manualInput" placeholder="Paste User ID  e.g. ANT-20260429-IVMY" />
     <button onclick="submitManual()">Submit</button>
   </div>
 
@@ -249,7 +256,7 @@ body{
 </div>
 
 <div class="logs" id="logs">
-  <span style="color:var(--muted);font-size:0.78rem;flex-shrink:0;">Recent scans appear here</span>
+  <span id="logPlaceholder" style="color:var(--muted);font-size:0.78rem;flex-shrink:0;">Recent scans appear here</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -258,17 +265,18 @@ body{
 const API_URL = 'https://script.google.com/macros/s/AKfycbxkQXq5BDQ3xsCiPHQxSHfRtG2Vz0lJ3U8RFkAwtCWgMIqZnpVgmeb6dSs2UwrsUuii7w/exec';
 
 // ── State ──
-let codeReader  = null;
-let isScanning  = false;
-let cooldown    = false;
-let cardTimer   = null;
+let codeReader = null;
+let isScanning = false;
+let cooldown   = false;
+let cardTimer  = null;
+let coolTimer  = null;
 
 // ── Clock ──
-(function tick(){
+(function tick() {
   const n = new Date();
   document.getElementById('clock').textContent =
-    n.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})
-    + ' · ' + n.toTimeString().slice(0,8);
+    n.toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' })
+    + ' · ' + n.toTimeString().slice(0, 8);
   setTimeout(tick, 1000);
 })();
 
@@ -286,18 +294,21 @@ function showToast(msg, type) {
 const card = document.getElementById('card');
 function showCard(status, data) {
   const s = status.toLowerCase();
-  document.getElementById('cname').textContent  = s === 'invalid'
-    ? (data.message || 'Error') : (data.name   || 'Unknown');
-  document.getElementById('crole').textContent  = s === 'invalid'
-    ? '' : (data.role   || 'N/A');
-  document.getElementById('cid').textContent    = data.userId || '';
+  document.getElementById('cname').textContent = s === 'invalid'
+    ? (data.message || 'Error') : (data.name || 'Unknown');
+  document.getElementById('crole').textContent = s === 'invalid'
+    ? '' : (data.role || 'N/A');
+  document.getElementById('cid').textContent   = data.userId || '';
+
+  // FIX: backend scan response uses "timestamp", logs use "scannedAt"
   const ts = data.timestamp || data.scannedAt;
-  document.getElementById('ctime').textContent  = ts
+  document.getElementById('ctime').textContent = ts
     ? new Date(ts).toLocaleTimeString() : '--';
+
   const b = document.getElementById('cbadge');
   b.textContent = status;
   b.className   = 'badge ' + s;
-  card.className = 'card show ' + (s==='in'?'in': s==='out'?'out':'bad');
+  card.className = 'card show ' + (s === 'in' ? 'in' : s === 'out' ? 'out' : 'bad');
   clearTimeout(cardTimer);
   cardTimer = setTimeout(() => { card.className = 'card'; }, 4500);
 }
@@ -307,18 +318,33 @@ function jsonp(url, cb) {
   const name = 'jcb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   const s    = document.createElement('script');
   let done   = false;
+
   window[name] = (data) => {
-    if (done) return; done = true;
-    clearTimeout(t); s.remove(); delete window[name]; cb(null, data);
+    if (done) return;
+    done = true;
+    clearTimeout(t);
+    s.remove();
+    delete window[name];
+    cb(null, data);
   };
+
   const t = setTimeout(() => {
-    if (done) return; done = true;
-    s.remove(); delete window[name]; cb(new Error('timeout'));
-  }, 9000);
+    if (done) return;
+    done = true;
+    s.remove();
+    delete window[name];
+    cb(new Error('timeout'));
+  }, 10000);
+
   s.onerror = () => {
-    if (done) return; done = true;
-    clearTimeout(t); s.remove(); delete window[name]; cb(new Error('load error'));
+    if (done) return;
+    done = true;
+    clearTimeout(t);
+    s.remove();
+    delete window[name];
+    cb(new Error('load error'));
   };
+
   s.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + name;
   document.head.appendChild(s);
 }
@@ -327,29 +353,50 @@ function jsonp(url, cb) {
 function sendToBackend(p) {
   const url = API_URL
     + '?action=scan'
-    + '&userId=' + encodeURIComponent(p.userId)
-    + '&name='   + encodeURIComponent(p.name   || '')
-    + '&role='   + encodeURIComponent(p.role   || '')
-    + '&issued=' + encodeURIComponent(p.issued || '');
+    + '&userId=' + encodeURIComponent(p.userId        || '')
+    + '&name='   + encodeURIComponent(p.name          || '')
+    + '&role='   + encodeURIComponent(p.role          || '')
+    + '&issued=' + encodeURIComponent(p.issued        || '');
 
   jsonp(url, (err, data) => {
-    cooldown = false;
     if (err) {
-      showToast('⚠️ Server error', 'err');
+      showToast('⚠️ Server error — check connection', 'err');
       showCard('INVALID', { message: 'Server Error' });
+      // FIX: release cooldown after 3s on error so user can retry
+      clearTimeout(coolTimer);
+      coolTimer = setTimeout(() => { cooldown = false; }, 3000);
       return;
     }
+
     const st = (data.status || '').toUpperCase();
+
     if (st === 'DUPLICATE') {
       showToast('⚠️ Already logged — duplicate scan', 'warn');
+      // FIX: release cooldown after 3s so scanner can be used again
+      clearTimeout(coolTimer);
+      coolTimer = setTimeout(() => { cooldown = false; }, 3000);
+
     } else if (st === 'INVALID') {
       showToast('❌ ' + (data.message || 'Invalid QR'), 'err');
       showCard('INVALID', { message: data.message });
-    } else {
-      const time = new Date(data.scannedAt || Date.now()).toLocaleTimeString();
-      showToast('✅ ' + st + ' logged at ' + time, 'ok');
+      clearTimeout(coolTimer);
+      coolTimer = setTimeout(() => { cooldown = false; }, 3000);
+
+    } else if (st === 'IN' || st === 'OUT') {
+      // FIX: use data.timestamp (scan response field), fallback to scannedAt
+      const ts   = data.timestamp || data.scannedAt || new Date().toISOString();
+      const time = new Date(ts).toLocaleTimeString();
+      showToast('✅ ' + st + ' — ' + (data.name || '') + ' at ' + time, 'ok');
       showCard(st, data);
       prependLog(data);
+      // Release cooldown after card dismisses (4.5s)
+      clearTimeout(coolTimer);
+      coolTimer = setTimeout(() => { cooldown = false; }, 4500);
+
+    } else {
+      showToast('⚠️ Unexpected response', 'warn');
+      clearTimeout(coolTimer);
+      coolTimer = setTimeout(() => { cooldown = false; }, 3000);
     }
   });
 }
@@ -358,7 +405,6 @@ function sendToBackend(p) {
 function handleQR(raw) {
   if (cooldown) return;
   const trimmed = raw.trim();
-  console.log("QR raw:", trimmed);
 
   try {
     const p = JSON.parse(trimmed);
@@ -369,70 +415,71 @@ function handleQR(raw) {
     cooldown = true;
     showToast('QR detected — sending…', 'info');
     sendToBackend(p);
-  } catch(e) {
-    showToast('❌ QR not valid JSON', 'err');
-    console.error("Parse error:", e, "raw:", trimmed);
+  } catch (e) {
+    // Not JSON — ignore silently (ZXing may fire on barcodes, etc.)
+    console.warn('Non-JSON QR ignored:', trimmed);
   }
 }
 
-// ── Manual entry fallback ──
+// ── Manual Entry ──
 function submitManual() {
   const val = document.getElementById('manualInput').value.trim();
   if (!val) { showToast('Enter a User ID', 'warn'); return; }
+  if (cooldown) { showToast('Please wait…', 'warn'); return; }
 
-  // Accept either raw userId string OR full JSON
   let payload;
   try {
     payload = JSON.parse(val);
-  } catch(e) {
-    // Treat as plain userId
+  } catch (e) {
+    // Plain userId string — backend will fill name/role/issued from sheet
     payload = { userId: val, name: '', role: '', issued: '' };
   }
 
   if (!payload.userId) { showToast('Invalid input', 'err'); return; }
+
+  // Basic ID format check on client
+  const idPattern = /^ANT-\d{8}-[A-Z0-9]{4}$/;
+  if (!idPattern.test(payload.userId)) {
+    showToast('❌ Invalid ID format', 'err');
+    return;
+  }
+
   cooldown = true;
   showToast('Submitting…', 'info');
   sendToBackend(payload);
   document.getElementById('manualInput').value = '';
 }
 
-// ── ZXing Scanner ──
+// ── ZXing Camera Scanner ──
 async function startScan() {
   const btn = document.getElementById('sbtn');
   btn.disabled = true;
   document.getElementById('sbtnLbl').textContent = 'Starting…';
 
   try {
-    // No hints — ZXing.DecodeHintType does not exist in the UMD build
     codeReader = new ZXing.BrowserMultiFormatReader();
 
-    // listVideoInputDevices is an instance method in @zxing/library
-    let deviceId = undefined; // undefined = let ZXing pick environment camera
+    // Try to pick the rear/environment camera
+    let deviceId = undefined;
     try {
       const devices = await codeReader.listVideoInputDevices();
-      const backCam = devices.find(d =>
-        /back|rear|environment/i.test(d.label)
-      ) || devices[devices.length - 1];
+      const backCam = devices.find(d => /back|rear|environment/i.test(d.label))
+                   || devices[devices.length - 1];
       if (backCam) deviceId = backCam.deviceId;
-    } catch(e) {
-      // listing failed — proceed with undefined, ZXing will use default camera
-      console.warn('Could not list cameras, using default:', e);
+    } catch (e) {
+      console.warn('Camera listing failed, using default:', e);
     }
 
-    await codeReader.decodeFromVideoDevice(
-      deviceId,
-      'video',
-      (result, err) => {
-        if (result) handleQR(result.getText());
-        // err fires on every frame with no QR — ignore silently
-      }
-    );
+    await codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
+      if (result) handleQR(result.getText());
+      // err fires on every frame with no QR — ignore silently
+    });
 
     isScanning = true;
     btn.disabled = false;
     setUI(true);
 
-  } catch(err) {
+  } catch (err) {
     btn.disabled = false;
     document.getElementById('sbtnLbl').textContent = 'Start Scan';
     console.error('Camera error:', err);
@@ -440,20 +487,23 @@ async function startScan() {
     if (s.includes('NotAllowedError') || s.includes('ermission')) {
       document.getElementById('errScreen').classList.add('show');
     } else if (s.includes('NotFoundError')) {
-      showToast('❌ No camera found', 'err');
+      showToast('❌ No camera found on this device', 'err');
     } else {
-      showToast('❌ Camera error — ' + err.name, 'err');
+      showToast('❌ Camera error: ' + (err.name || err), 'err');
     }
   }
 }
 
 function stopScan() {
   if (codeReader) {
-    codeReader.reset();
+    try { codeReader.reset(); } catch(e) {}
     codeReader = null;
   }
   isScanning = false;
   cooldown   = false;
+  clearTimeout(coolTimer);
+  clearTimeout(cardTimer);
+  card.className = 'card';
   document.getElementById('sbtn').disabled = false;
   setUI(false);
 }
@@ -464,14 +514,15 @@ function toggleScan() {
 
 function setUI(scanning) {
   document.getElementById('sbtn').classList.toggle('stop', scanning);
-  document.getElementById('sbtnIcon').textContent = scanning ? '◼' : '⬡';
-  document.getElementById('sbtnLbl').textContent  = scanning ? 'Stop Scan' : 'Start Scan';
-  document.getElementById('hint').innerHTML       = scanning
+  document.getElementById('sbtnIcon').textContent  = scanning ? '◼' : '⬡';
+  document.getElementById('sbtnLbl').textContent   = scanning ? 'Stop Scan' : 'Start Scan';
+  document.getElementById('hint').innerHTML        = scanning
     ? 'Align QR code within the frame'
     : 'Press <strong>Start Scan</strong> to activate camera';
   document.getElementById('statusTxt').textContent = scanning ? 'Scanning…' : 'Idle';
-  const dot = document.getElementById('dot');
-  dot.className = 'dot' + (scanning ? '' : ' amber');
+  document.getElementById('dot').className         = 'dot' + (scanning ? '' : ' amber');
+  // FIX: scan line only visible when scanning
+  document.getElementById('vf').classList.toggle('active', scanning);
 }
 
 // ── Logs Strip ──
@@ -479,24 +530,27 @@ const logsEl = document.getElementById('logs');
 function prependLog(log) {
   const ts   = log.timestamp || log.scannedAt;
   const time = ts
-    ? new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false})
+    ? new Date(ts).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false })
     : '--';
   const pill = document.createElement('div');
   pill.className = 'pill';
   pill.innerHTML =
-    '<span style="font-weight:700">' + (log.name||'?') + '</span>'
-    + '<span class="badge '+(log.status||'').toLowerCase()
-    + '" style="font-size:.6rem;padding:.1rem .4rem">'+(log.status||'')+'</span>'
-    + '<span style="font-family:var(--mono);color:var(--muted);font-size:.72rem">'+time+'</span>';
-  const ph = logsEl.querySelector('span');
+    '<span style="font-weight:700">' + (log.name || '?') + '</span>'
+    + '<span class="badge ' + (log.status || '').toLowerCase()
+    + '" style="font-size:.6rem;padding:.1rem .4rem">' + (log.status || '') + '</span>'
+    + '<span style="font-family:var(--mono);color:var(--muted);font-size:.72rem">' + time + '</span>';
+
+  // Remove placeholder text on first real log
+  const ph = document.getElementById('logPlaceholder');
   if (ph) ph.remove();
   logsEl.prepend(pill);
 }
 
 function fetchLogs() {
   jsonp(API_URL + '?action=logs', (err, data) => {
-    if (err || !data?.logs?.length) return;
+    if (err || !data || !Array.isArray(data.logs) || !data.logs.length) return;
     logsEl.innerHTML = '';
+    // API returns newest-first; reverse to prepend oldest→newest
     data.logs.slice().reverse().forEach(prependLog);
   });
 }
@@ -506,8 +560,8 @@ setInterval(fetchLogs, 8000);
 // ── Guard: ZXing must load ──
 window.addEventListener('load', () => {
   if (typeof ZXing === 'undefined') {
-    document.getElementById('errTitle').textContent = 'Scanner failed to load';
-    document.getElementById('errMsg').textContent   = 'Check internet and refresh.';
+    document.getElementById('errTitle').textContent = 'Scanner library failed to load';
+    document.getElementById('errMsg').textContent   = 'Check your internet connection and refresh.';
     document.getElementById('errScreen').classList.add('show');
   }
 });
