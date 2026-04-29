@@ -407,13 +407,19 @@ function scanFrame() {
 }
 
 function handleQR(raw) {
+  const trimmed = raw.trim();
+  console.log("Raw QR Data:", trimmed);
   try {
-    const p = JSON.parse(raw);
-    if (!p.userId) { showToast('❌ Missing userId in QR', 'err'); return; }
+    const p = JSON.parse(trimmed);
+    if (!p.userId) {
+      showToast('❌ Missing userId in QR', 'err');
+      return;
+    }
     cooldown = true;
     showToast('QR detected — sending…', 'info');
     sendToBackend(p);
   } catch(e) {
+    console.error("JSON Parse Error:", e, "Content:", trimmed);
     showToast('❌ QR is not valid JSON', 'err');
   }
 }
