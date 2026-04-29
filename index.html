@@ -387,23 +387,23 @@ function sendToBackend(p) {
 function scanFrame() {
   if (!isScanning) return;
 
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+  if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
     cvs.width  = video.videoWidth;
     cvs.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, cvs.width, cvs.height);
 
     const img  = ctx.getImageData(0, 0, cvs.width, cvs.height);
     const code = jsQR(img.data, img.width, img.height, {
-      inversionAttempts: 'dontInvert'
+      inversionAttempts: 'attemptBoth'
     });
 
     if (code) {
-      resetNoQrTimer(); // got something — reset warning timer
+      resetNoQrTimer();
       if (!cooldown) handleQR(code.data);
     }
   }
 
-  rafId = requestAnimationFrame(scanFrame);
+  rafId = setTimeout(() => requestAnimationFrame(scanFrame), 100);
 }
 
 function handleQR(raw) {
@@ -433,7 +433,7 @@ function resetNoQrTimer() {
   noQrTimer = setTimeout(() => {
     if (isScanning) showToast('📷 No QR visible — adjust camera', 'warn');
     resetNoQrTimer();
-  }, 7000);
+  }, 12000);
 }
 
 /* ─────────────────────────────────────────
@@ -461,8 +461,8 @@ async function startScan() {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: 'environment' },
-        width:  { ideal: 1280 },
-        height: { ideal: 720 }
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 }
       },
       audio: false
     });
@@ -493,6 +493,7 @@ function stopScan() {
   isScanning = false;
   cooldown   = false;
   clearTimeout(noQrTimer);
+  clearTimeout(rafId);
   cancelAnimationFrame(rafId);
 
   if (stream) {
